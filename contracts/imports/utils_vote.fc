@@ -1,0 +1,43 @@
+cell pack_data(slice user_addr, slice main_addr, int vote) inline {
+    return begin_cell()
+            .store_slice(user_addr)
+            .store_slice(main_addr)
+            .store_int(vote, 3)
+        .end_cell();
+}
+
+cell calculate_state_init(cell data, cell code) inline {
+    return begin_cell()
+            .store_uint(0, 2)
+            .store_dict(code)
+            .store_dict(data)
+            .store_uint(0, 1)
+            .end_cell();
+}
+
+slice calculate_address(cell state_init) inline {
+    return begin_cell().store_uint(4, 3)
+            .store_int(0, 8) ;; workchain
+            .store_uint(cell_hash(state_init), 256)
+            .end_cell()
+            .begin_parse();
+}
+
+slice calculate_vote_address(slice user_addr, slice main_addr, cell code) inline {
+    cell data = pack_data(user_addr, main_addr, -2);
+    return calculate_address(calculate_state_init(data, code));
+}
+
+const int const::text::yes = 7955827; ;; 24 bits
+const int const::text::no = 28271; ;; 16 bits
+int parse_yes_or_not_msg(slice msg) inline {
+    int vote = slice_bits(msg) == 24 ? msg~load_uint(24) : msg~load_uint(16);
+
+    if (vote == const::text::yes) {
+        return -1;
+    } elseif (vote == const::text::no) {
+        return 0;
+    } else {
+        return 1;
+    }
+}

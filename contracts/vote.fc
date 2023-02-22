@@ -1,0 +1,164 @@
+#include "imports/stdlib.fc";
+#include "imports/utils.fc";
+#include "imports/constants_vote.fc";
+#include "imports/utils_vote.fc";
+
+const int const::min_to_vote = 10000000;
+const int const::min_for_storage = 60000000;
+
+;; storage variables
+global int ctx_votes_yes;
+global int ctx_votes_no;
+global int ctx_votes_abstain;
+global int ctx_time_when_finish;
+global slice ctx_initiator_addr;
+global cell ctx_vote_code_hex;
+
+() load_data() impure {
+    var ds = get_data().begin_parse();
+
+    ctx_votes_yes = ds~load_uint(32);
+    ctx_votes_no = ds~load_uint(32);
+    ctx_votes_abstain = ds~load_uint(32);
+    ctx_time_when_finish = ds~load_int(32);
+    ctx_initiator_addr = ds~load_msg_addr();
+    ctx_vote_code_hex = ds~load_ref();
+
+    ;;     ds.end_parse();
+}
+
+() save_data() impure {
+    set_data(
+            begin_cell()
+                    .store_uint(ctx_votes_yes,32)
+                    .store_uint(ctx_votes_no,32)
+                    .store_uint(ctx_votes_abstain,32)
+                    .store_int(ctx_time_when_finish, 32)
+                    .store_slice(ctx_initiator_addr)
+                    .store_ref(ctx_vote_code_hex)
+                    .end_cell()
+    );
+}
+
+;; 'Already voted'
+builder store_voted_text(builder b) inline {
+    return b.store_uint(5183393240786912077281565631844, 104);
+}
+
+() deploy_vote_msg(slice to_address, int vote, int msg_value) impure {
+    cell data = pack_data(to_address, my_address(), -2);
+    cell state_init = calculate_state_init(data, ctx_vote_code_hex);
+    slice to_wallet_address = calculate_address(state_init);
+    cell body = begin_cell()
+            .store_int(vote, 3)
+            .store_slice(to_address)
+            .end_cell();
+    var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(to_wallet_address)
+            .store_coins(msg_value)
+            .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+            .store_ref(state_init)
+            .store_ref(body)
+            ;
+    ;; begin_cell().store_uint(0, 1).end_cell()
+    send_raw_message(msg.end_cell(), 1);
+}
+
+() decrease_vote(int vote) impure {
+    if (vote == const::vote:yes) {
+        ctx_votes_yes -= 1;
+    } elseif (vote == const::vote:no) {
+        ctx_votes_no -= 1;
+    } else {
+        ctx_votes_abstain -= 1;
+    }
+}
+
+() increase_vote(int vote) impure {
+    if (vote == const::vote:yes) {
+        ctx_votes_yes += 1;
+    } elseif (vote == const::vote:no) {
+        ctx_votes_no += 1;
+    } else {
+        ctx_votes_abstain += 1;
+    }
+}
+
+() on_bounce(int msg_value, slice in_msg_body) impure {
+    in_msg_body~skip_bits(32);
+    load_data();
+    int vote = in_msg_body~load_int(3);
+;;     slice u_addr = in_msg_body~load_msg_addr();
+    decrease_vote(vote);
+    save_data();
+;;     send_text_msg(u_addr, msg_value, 1, begin_cell().store_voted_text());
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore all empty messages
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4); ;; the first four bits of serialized message contain certain flags, one of which indicates whether the message is bounced
+    ;; a message is bounced when a contract receives a bounceable message and throws during its processing
+    ;; the bounced message is then returned to sender with `bounced` bit set, this is a way to handle errors in TON
+
+    if (flags & 1) { ;; all bounced messages
+        on_bounce(msg_value, in_msg_body);
+        return ();
+    }
+
+    throw_unless(error::not_enough_funds, msg_value > const::min_to_vote);
+    load_data();
+    throw_if(error::voting_finished, (ctx_time_when_finish > 0) & (ctx_time_when_finish > now())); ;; time is over
+
+    slice from_addr = cs~load_msg_addr();
+
+    ;; new vote
+    int op = in_msg_body~load_uint(32);
+    if (op == 0) {
+        int vote = parse_yes_or_not_msg(in_msg_body);
+        increase_vote(vote);
+        save_data();
+        if (const::min_for_storage > my_balance) {
+            msg_value -= const::min_for_storage;
+        }
+        deploy_vote_msg(from_addr, vote, msg_value);
+        return ();
+    }
+
+    ;; change vote
+    if (op == op::change_vote) {
+        slice u_addr = in_msg_body~load_msg_addr();
+        slice vote_addr = calculate_vote_address(u_addr, my_address(), ctx_vote_code_hex);
+        if (equal_slices(vote_addr, from_addr)) {
+            int prev_vote = in_msg_body~load_int(3);
+            int new_vote = in_msg_body~load_int(3);
+            decrease_vote(prev_vote);
+            increase_vote(new_vote);
+            save_data();
+            return ();
+        }
+        throw(error::invalid_address);
+    }
+
+    throw(error:unknown_op);
+}
+
+;; get votes
+(int, int) get_votes() method_id {
+    load_data();
+    return (ctx_votes_yes, ctx_votes_no);
+}
+
+(int) is_finished() method_id {
+    load_data();
+    return (ctx_time_when_finish > 0) & (ctx_time_when_finish > now());
+}
+
+(slice) get_vote_addr(slice user_addr) method_id {
+    load_data();
+    return calculate_vote_address(user_addr, my_address(), ctx_vote_code_hex);
+}

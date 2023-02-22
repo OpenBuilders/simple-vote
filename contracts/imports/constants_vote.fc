@@ -1,0 +1,13 @@
+const int const::vote:yes = -1;
+const int const::vote:no = 0;
+const int const::vote:abstain = 1;
+const int const::vote:nothing = -2;
+
+const int op::change_vote = 201;
+
+const int error:unknown_op = 100;
+const int error::voting_finished = 101;
+const int error::already_voted = 102;
+const int error::invalid_vote = 103;
+const int error::invalid_address = 104;
+const int error::not_enough_funds = 105;
