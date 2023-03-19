@@ -25,7 +25,7 @@ global cell storage::project_name;
     storage::vote_code_hex = ds~load_ref();
     storage::project_name = ds~load_ref();
 
-    ;;     ds.end_parse();
+    ds.end_parse();
 }
 
 () save_data() impure {
