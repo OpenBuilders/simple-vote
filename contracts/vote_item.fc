@@ -1,37 +1,37 @@
-#include "imports/stdlib.fc";
-#include "imports/constants_vote.fc";
-#include "imports/utils_vote.fc";
+#include "imports/common/stdlib.fc";
+#include "imports/vote/vote_constants.fc";
+#include "imports/vote/vote_utils.fc";
 
-const int const::min_for_storage = 30000000;
+const int const::min_for_storage = 10000000;
 
 ;; storage
-global slice ctx_owner_addr;
-global slice ctx_main_addr;
-global int ctx_vote;
+global slice storage::user_addr;
+global slice storage::vote_addr;
+global int storage::user_vote;
 
 () load_data() impure {
     var ds = get_data().begin_parse();
 
-    ctx_owner_addr = ds~load_msg_addr();
-    ctx_main_addr = ds~load_msg_addr();
-    ctx_vote = ds~load_int(3);
+    storage::user_addr = ds~load_msg_addr();
+    storage::vote_addr = ds~load_msg_addr();
+    storage::user_vote = ds~load_int(3);
 }
 
 () save_data() impure {
-    set_data(pack_data(ctx_owner_addr, ctx_main_addr, ctx_vote));
+    set_data(pack_data(storage::user_addr, storage::vote_addr, storage::user_vote));
 }
 
 () change_my_vote_msg(int msg_value, int prev_vote) impure {
     var body = begin_cell()
             .store_uint(op::change_vote, 32)
-            .store_slice(ctx_owner_addr)
+            .store_slice(storage::user_addr)
             .store_int(prev_vote, 3)
-            .store_int(ctx_vote, 3)
+            .store_int(storage::user_vote, 3)
         .end_cell();
 
     var msg = begin_cell()
             .store_uint(0x18, 6)
-            .store_slice(ctx_main_addr)
+            .store_slice(storage::vote_addr)
             .store_coins(msg_value)
             .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
             .store_ref(body)
@@ -56,9 +56,9 @@ global int ctx_vote;
     slice from_addr = cs~load_msg_addr();
 
     ;; init action
-    if (equal_slices(ctx_main_addr, from_addr)) {
-        if (ctx_vote == const::vote:nothing) {
-            ctx_vote = in_msg_body~load_int(3);
+    if (equal_slices(storage::vote_addr, from_addr)) {
+        if (storage::user_vote == const::vote:nothing) {
+            storage::user_vote = in_msg_body~load_int(3);
             save_data();
             return ();
         } else {
@@ -71,14 +71,18 @@ global int ctx_vote;
     }
 
     ;; actiion for change vote from User
-    if (equal_slices(ctx_owner_addr, from_addr)) {
+    if (equal_slices(storage::user_addr, from_addr)) {
         int op = in_msg_body~load_uint(32);
         if (op == 0) {
-            int prev_vote = ctx_vote;
-            ctx_vote = parse_yes_or_not_msg(in_msg_body);
+            int prev_vote = storage::user_vote;
+            storage::user_vote = parse_yes_or_not_msg(in_msg_body);
             save_data();
 
-            if (ctx_vote != prev_vote) {
+            if (storage::user_vote != prev_vote) {
+                [int balance, cell extra] = get_balance();
+                if (balance < const::min_for_storage) {
+                    msg_value = msg_value - const::min_for_storage;
+                }
                 change_my_vote_msg(msg_value, prev_vote);
             }
 
@@ -91,11 +95,11 @@ global int ctx_vote;
 
 (int) get_my_vote() method_id {
     load_data();
-    return ctx_vote;
+    return storage::user_vote;
 }
 
 ;; get main addr
 (slice) get_main_addr() method_id {
     load_data();
-    return ctx_main_addr;
+    return storage::vote_addr;
 }

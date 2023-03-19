@@ -1,5 +1,5 @@
 import { Blockchain } from '@ton-community/sandbox';
-import { Cell, toNano } from 'ton-core';
+import { beginCell, Cell, toNano } from 'ton-core';
 import { Vote } from '../wrappers/Vote';
 import '@ton-community/test-utils';
 import { compile } from '@ton-community/blueprint';
@@ -22,7 +22,8 @@ describe('Vote', () => {
         const user = await blockchain.treasury('user')
         const vote = blockchain.openContract(Vote.createFromConfig({
             initiatorAddress: initiator.address,
-            item_code_hex: await compile('VoteItem')
+            item_code_hex: await compile('VoteItem'),
+            project_name: beginCell().storeStringTail('Ston.fi').endCell()
         }, code));
 
         const deployer = await blockchain.treasury('deployer');
@@ -39,6 +40,7 @@ describe('Vote', () => {
         expect(no).toEqual(0)
 
         const result = await vote.sendVote(user.getSender(), true)
+        console.log(result.transactions[1])
         expect(result.transactions).toHaveTransaction({
             from: user.address,
             to: vote.address,
@@ -54,10 +56,10 @@ describe('Vote', () => {
         expect(vote2[0]).toBe(1)
         expect(vote2[1]).toBe(1)
 
-        await vote.sendVote(user.getSender(), false)
+        await vote.sendVote(user.getSender(), true)
         const vote3 = await vote.getVotes()
-        expect(vote3[0]).toBe(1)
-        expect(vote3[1]).toBe(2)
+        expect(vote3[0]).toBe(2)
+        expect(vote3[1]).toBe(1)
     });
 
     it('bounce test', async () => {
@@ -67,22 +69,23 @@ describe('Vote', () => {
         const voteItem = await blockchain.treasury('vote_item')
         const vote = blockchain.openContract(Vote.createFromConfig({
             initiatorAddress: initiator.address,
-            item_code_hex: await compile('VoteItem')
+            item_code_hex: await compile('VoteItem'),
+            project_name: beginCell().storeStringTail('Ston.fi').endCell()
         }, code));
 
         const deployer = await blockchain.treasury('deployer');
         await vote.sendDeploy(deployer.getSender(), toNano('0.05'));
         await vote.sendVote(user.getSender(), true)
         await vote.sendVote(user.getSender(), true)
+        // todo: Change Sender to real VoteItem
         const result = await vote.sendBouncedItem(voteItem.getSender(), true)
-        console.log(result.transactions[1])
         expect(result.transactions).toHaveTransaction({
-            from: voteItem.address,
             to: vote.address,
-
+            from: voteItem.address,
+            aborted: true,
         })
-        const vote1 = await vote.getVotes()
-        expect(vote1[0]).toEqual(1)
-        expect(vote1[1]).toEqual(0)
+        const votes = await vote.getVotes()
+        expect(votes[0]).toEqual(1)
+        expect(votes[1]).toEqual(0)
     });
 });

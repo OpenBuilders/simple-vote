@@ -18,6 +18,7 @@ export type VoteConfig = {
     abstain?: number
     timeWhenFinish?: number
     item_code_hex: Cell
+    project_name: Cell
 };
 
 export function voteConfigToCell(config: VoteConfig): Cell {
@@ -28,6 +29,7 @@ export function voteConfigToCell(config: VoteConfig): Cell {
         .storeInt(config.timeWhenFinish ?? 0, 32)
         .storeAddress(config.initiatorAddress)
         .storeRef(config.item_code_hex)
+        .storeRef(config.project_name)
         .endCell();
 }
 
@@ -54,22 +56,21 @@ export class Vote implements Contract {
 
     async sendVote(provider: ContractProvider, via: Sender, vote: boolean, value?: bigint) {
         return await provider.internal(via, {
-            value: value ?? toNano(1),
+            value: value ?? toNano('0.1'),
             body: beginCell()
                 .storeUint(0, 32)
-                .storeUint(vote ? 7955827 : 28271, vote ? 24 : 16)
+                .storeUint(vote ? 249166704916623 : 4036989588, vote ? 48 : 32)
                 .endCell(),
         });
     }
 
-    async sendBouncedItem(provider: ContractProvider, via: Sender, vote: boolean, value?: bigint) {
-        return await provider.internal(via, {
+    sendBouncedItem(provider: ContractProvider, via: Sender, vote: boolean, value?: bigint) {
+        return provider.internal(via, {
             bounce: true,
             value: value ?? toNano(1),
             body: beginCell()
                 .storeUint(0, 32)
                 .storeInt(vote ? -1 : 0, 3)
-                .storeUint(0, 256 - 3)
                 .endCell(),
         });
     }
@@ -77,5 +78,10 @@ export class Vote implements Contract {
     async getVotes(provider: ContractProvider) {
         const result = await provider.get('get_votes', [])
         return [result.stack.readNumber(), result.stack.readNumber()]
+    }
+
+    async getProjectName(provider: ContractProvider) {
+        const result = await provider.get('get_project_name', [])
+        return [result.stack.readString()]
     }
 }

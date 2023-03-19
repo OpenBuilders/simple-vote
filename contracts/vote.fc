@@ -1,28 +1,29 @@
-#include "imports/stdlib.fc";
-#include "imports/utils.fc";
-#include "imports/constants_vote.fc";
-#include "imports/utils_vote.fc";
+#include "imports/common/stdlib.fc";
+#include "imports/vote/vote_constants.fc";
+#include "imports/vote/vote_utils.fc";
 
-const int const::min_to_vote = 10000000;
+const int const::min_to_vote = 100000000;
 const int const::min_for_storage = 60000000;
 
 ;; storage variables
-global int ctx_votes_yes;
-global int ctx_votes_no;
-global int ctx_votes_abstain;
-global int ctx_time_when_finish;
-global slice ctx_initiator_addr;
-global cell ctx_vote_code_hex;
+global int storage::votes_yes;
+global int storage::votes_no;
+global int storage::votes_abstain;
+global int storage::time_when_finish;
+global slice storage::initiator_addr;
+global cell storage::vote_code_hex;
+global cell storage::project_name;
 
 () load_data() impure {
     var ds = get_data().begin_parse();
 
-    ctx_votes_yes = ds~load_uint(32);
-    ctx_votes_no = ds~load_uint(32);
-    ctx_votes_abstain = ds~load_uint(32);
-    ctx_time_when_finish = ds~load_int(32);
-    ctx_initiator_addr = ds~load_msg_addr();
-    ctx_vote_code_hex = ds~load_ref();
+    storage::votes_yes = ds~load_uint(32);
+    storage::votes_no = ds~load_uint(32);
+    storage::votes_abstain = ds~load_uint(32);
+    storage::time_when_finish = ds~load_int(32);
+    storage::initiator_addr = ds~load_msg_addr();
+    storage::vote_code_hex = ds~load_ref();
+    storage::project_name = ds~load_ref();
 
     ;;     ds.end_parse();
 }
@@ -30,12 +31,13 @@ global cell ctx_vote_code_hex;
 () save_data() impure {
     set_data(
             begin_cell()
-                    .store_uint(ctx_votes_yes,32)
-                    .store_uint(ctx_votes_no,32)
-                    .store_uint(ctx_votes_abstain,32)
-                    .store_int(ctx_time_when_finish, 32)
-                    .store_slice(ctx_initiator_addr)
-                    .store_ref(ctx_vote_code_hex)
+                    .store_uint(storage::votes_yes,32)
+                    .store_uint(storage::votes_no,32)
+                    .store_uint(storage::votes_abstain,32)
+                    .store_int(storage::time_when_finish, 32)
+                    .store_slice(storage::initiator_addr)
+                    .store_ref(storage::vote_code_hex)
+                    .store_ref(storage::project_name)
                     .end_cell()
     );
 }
@@ -47,7 +49,7 @@ builder store_voted_text(builder b) inline {
 
 () deploy_vote_msg(slice to_address, int vote, int msg_value) impure {
     cell data = pack_data(to_address, my_address(), -2);
-    cell state_init = calculate_state_init(data, ctx_vote_code_hex);
+    cell state_init = calculate_state_init(data, storage::vote_code_hex);
     slice to_wallet_address = calculate_address(state_init);
     cell body = begin_cell()
             .store_int(vote, 3)
@@ -67,21 +69,21 @@ builder store_voted_text(builder b) inline {
 
 () decrease_vote(int vote) impure {
     if (vote == const::vote:yes) {
-        ctx_votes_yes -= 1;
+        storage::votes_yes -= 1;
     } elseif (vote == const::vote:no) {
-        ctx_votes_no -= 1;
+        storage::votes_no -= 1;
     } else {
-        ctx_votes_abstain -= 1;
+        storage::votes_abstain -= 1;
     }
 }
 
 () increase_vote(int vote) impure {
     if (vote == const::vote:yes) {
-        ctx_votes_yes += 1;
+        storage::votes_yes += 1;
     } elseif (vote == const::vote:no) {
-        ctx_votes_no += 1;
+        storage::votes_no += 1;
     } else {
-        ctx_votes_abstain += 1;
+        storage::votes_abstain += 1;
     }
 }
 
@@ -89,10 +91,8 @@ builder store_voted_text(builder b) inline {
     in_msg_body~skip_bits(32);
     load_data();
     int vote = in_msg_body~load_int(3);
-;;     slice u_addr = in_msg_body~load_msg_addr();
     decrease_vote(vote);
     save_data();
-;;     send_text_msg(u_addr, msg_value, 1, begin_cell().store_voted_text());
 }
 
 () recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
@@ -101,18 +101,15 @@ builder store_voted_text(builder b) inline {
     }
 
     slice cs = in_msg_full.begin_parse();
-    int flags = cs~load_uint(4); ;; the first four bits of serialized message contain certain flags, one of which indicates whether the message is bounced
-    ;; a message is bounced when a contract receives a bounceable message and throws during its processing
-    ;; the bounced message is then returned to sender with `bounced` bit set, this is a way to handle errors in TON
+    int flags = cs~load_uint(4);
 
     if (flags & 1) { ;; all bounced messages
         on_bounce(msg_value, in_msg_body);
         return ();
     }
-
-    throw_unless(error::not_enough_funds, msg_value > const::min_to_vote);
+    throw_unless(error::not_enough_funds, msg_value >= const::min_to_vote);
     load_data();
-    throw_if(error::voting_finished, (ctx_time_when_finish > 0) & (ctx_time_when_finish > now())); ;; time is over
+    throw_if(error::voting_finished, (storage::time_when_finish > 0) & (storage::time_when_finish > now())); ;; time is over
 
     slice from_addr = cs~load_msg_addr();
 
@@ -132,7 +129,7 @@ builder store_voted_text(builder b) inline {
     ;; change vote
     if (op == op::change_vote) {
         slice u_addr = in_msg_body~load_msg_addr();
-        slice vote_addr = calculate_vote_address(u_addr, my_address(), ctx_vote_code_hex);
+        slice vote_addr = calculate_vote_address(u_addr, my_address(), storage::vote_code_hex);
         if (equal_slices(vote_addr, from_addr)) {
             int prev_vote = in_msg_body~load_int(3);
             int new_vote = in_msg_body~load_int(3);
@@ -150,15 +147,20 @@ builder store_voted_text(builder b) inline {
 ;; get votes
 (int, int) get_votes() method_id {
     load_data();
-    return (ctx_votes_yes, ctx_votes_no);
+    return (storage::votes_yes, storage::votes_no);
 }
 
 (int) is_finished() method_id {
     load_data();
-    return (ctx_time_when_finish > 0) & (ctx_time_when_finish > now());
+    return (storage::time_when_finish > 0) & (storage::time_when_finish > now());
 }
 
 (slice) get_vote_addr(slice user_addr) method_id {
     load_data();
-    return calculate_vote_address(user_addr, my_address(), ctx_vote_code_hex);
+    return calculate_vote_address(user_addr, my_address(), storage::vote_code_hex);
+}
+
+(slice) get_project_name() method_id {
+    load_data();
+    return storage::project_name.begin_parse();
 }

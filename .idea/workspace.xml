@@ -4,9 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9f9f36ac-b7c6-48be-9d1a-967e7cc28119" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-    </list>
+    <list default="true" id="9f9f36ac-b7c6-48be-9d1a-967e7cc28119" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -37,7 +35,7 @@
     "RunOnceActivity.OpenProjectViewOnStart": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "WebServerToolWindowFactoryState": "false",
-    "last_opened_file_path": "/home/vplotvinov/var/www/vesting-contract/scripts",
+    "last_opened_file_path": "/home/vplotvinov/var/www/simple-voting",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
@@ -73,6 +71,7 @@
       <workItem from="1676384191040" duration="498000" />
       <workItem from="1676472381956" duration="1452000" />
       <workItem from="1676474510708" duration="50206000" />
+      <workItem from="1677058314877" duration="1613000" />
     </task>
     <servers />
   </component>
