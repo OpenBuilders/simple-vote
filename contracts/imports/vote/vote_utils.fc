@@ -41,3 +41,20 @@ int parse_yes_or_not_msg(slice msg) inline {
         return 1; ;; abstain
     }
 }
+
+() send_text_msg(slice to_addr, int value, int mode, builder content) impure {
+    var body = begin_cell()
+            .store_uint(0, 32)
+            .store_builder(content)
+            .end_cell();
+
+    var msg = begin_cell()
+            .store_uint(0x10, 6)
+            .store_slice(to_addr)
+            .store_coins(value)
+            .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_ref(body)
+            .end_cell();
+
+    send_raw_message(msg, mode);
+}

@@ -4,6 +4,7 @@ const int const::vote:abstain = 1;
 const int const::vote:nothing = -2;
 
 const int op::change_vote = 201;
+const int op::take_commission = 202;
 
 const int error:unknown_op = 100;
 const int error::voting_finished = 101;

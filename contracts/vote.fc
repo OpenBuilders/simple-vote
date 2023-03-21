@@ -2,8 +2,9 @@
 #include "imports/vote/vote_constants.fc";
 #include "imports/vote/vote_utils.fc";
 
-const int const::min_to_vote = 100000000;
-const int const::min_for_storage = 60000000;
+const int const::min_to_vote = 1000000000; ;; 1 TON
+const int const::min_for_storage = 60000000; ;; 0.06
+const int const::min_for_deploy_vote = 10000000; ;; 0.01
 
 ;; storage variables
 global int storage::votes_yes;
@@ -31,9 +32,9 @@ global cell storage::project_name;
 () save_data() impure {
     set_data(
             begin_cell()
-                    .store_uint(storage::votes_yes,32)
-                    .store_uint(storage::votes_no,32)
-                    .store_uint(storage::votes_abstain,32)
+                    .store_uint(storage::votes_yes, 32)
+                    .store_uint(storage::votes_no, 32)
+                    .store_uint(storage::votes_abstain, 32)
                     .store_int(storage::time_when_finish, 32)
                     .store_slice(storage::initiator_addr)
                     .store_ref(storage::vote_code_hex)
@@ -58,12 +59,12 @@ builder store_voted_text(builder b) inline {
     var msg = begin_cell()
             .store_uint(0x18, 6)
             .store_slice(to_wallet_address)
-            .store_coins(msg_value)
+            .store_coins(const::min_for_deploy_vote)
             .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
             .store_ref(state_init)
             .store_ref(body)
             ;
-    ;; begin_cell().store_uint(0, 1).end_cell()
+
     send_raw_message(msg.end_cell(), 1);
 }
 
@@ -112,9 +113,18 @@ builder store_voted_text(builder b) inline {
     throw_if(error::voting_finished, (storage::time_when_finish > 0) & (storage::time_when_finish > now())); ;; time is over
 
     slice from_addr = cs~load_msg_addr();
+    int op = in_msg_body~load_uint(32);
+
+
+    if (equal_slices(storage::initiator_addr, from_addr)) {
+        if (op == op::take_commission) {
+            int commission = my_balance - const::min_for_storage;
+            send_text_msg(from_addr, commission, 1, begin_cell().store_uint(8390880524967965285, 64));
+            return ();
+        }
+    }
 
     ;; new vote
-    int op = in_msg_body~load_uint(32);
     if (op == 0) {
         int vote = parse_yes_or_not_msg(in_msg_body);
         increase_vote(vote);

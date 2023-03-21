@@ -11,6 +11,13 @@ import {
 } from 'ton-core';
 import { compile } from "@ton-community/blueprint";
 
+export const Projects = {
+    stonfi: 'STON.fi',
+    dedust: 'DeDust',
+    startupMarket: 'StartupMarketer',
+    tonDiamonds: 'TonDiamonds',
+}
+
 export type VoteConfig = {
     initiatorAddress: Address
     yes?: number
@@ -60,6 +67,15 @@ export class Vote implements Contract {
             body: beginCell()
                 .storeUint(0, 32)
                 .storeUint(vote ? 249166704916623 : 4036989588, vote ? 48 : 32)
+                .endCell(),
+        });
+    }
+
+    async sendTakeCommissions(provider: ContractProvider, via: Sender, value?: bigint) {
+        return await provider.internal(via, {
+            value: value ?? toNano('0.1'),
+            body: beginCell()
+                .storeUint(202, 32)
                 .endCell(),
         });
     }
