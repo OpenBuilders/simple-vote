@@ -16,6 +16,8 @@ export const Projects = {
     dedust: 'DeDust',
     startupMarket: 'StartupMarketer',
     tonDiamonds: 'TonDiamonds',
+    tegro: 'TegroFinance',
+    megaton: 'MegatonFinance',
 }
 
 export type VoteConfig = {

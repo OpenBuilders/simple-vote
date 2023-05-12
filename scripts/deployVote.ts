@@ -6,8 +6,7 @@ export async function run(provider: NetworkProvider) {
     const vote = await Vote.createFromConfig({
         initiatorAddress: provider.sender().address ?? Address.parseFriendly('EQBYxzHox8t7EdJe-9MM5WwNJT1UPI3jIP_yl4bDxzBawHuU').address,
         item_code_hex: await compile('VoteItem'),
-        // project_name: beginCell().storeStringTail('DeDust').endCell()
-        project_name: beginCell().storeStringTail(Projects.stonfi).endCell()
+        project_name: beginCell().storeStringTail(Projects.tegro).endCell()
     }, await compile('Vote'));
 
     await provider.deploy(vote, toNano('0.05'));
