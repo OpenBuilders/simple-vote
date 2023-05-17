@@ -18,6 +18,7 @@ export const Projects = {
     tonDiamonds: 'TonDiamonds',
     tegro: 'TegroFinance',
     megaton: 'MegatonFinance',
+    tonApi: 'TonAPI',
 }
 
 export type VoteConfig = {
