@@ -19,6 +19,10 @@ export const Projects = {
     tegro: 'TegroFinance',
     megaton: 'MegatonFinance',
     tonApi: 'TonAPI',
+    getgems: 'Getgems',
+    tonstarter: 'Tonstarter',
+    tonkeeper: 'Tonkeeper',
+    tonhub: 'Tonhub'
 }
 
 export type VoteConfig = {
